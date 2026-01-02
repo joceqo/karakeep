@@ -315,6 +315,12 @@ export const assets = sqliteTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Media conversion fields
+    conversionStatus: text("conversionStatus", {
+      enum: ["pending", "converting", "success", "failure"],
+    }),
+    conversionProgress: integer("conversionProgress").default(0),
+    conversionJobId: text("conversionJobId"),
   },
 
   (tb) => [
@@ -372,7 +378,9 @@ export const bookmarkAssets = sqliteTable("bookmarkAssets", {
     .primaryKey()
     .$defaultFn(() => createId())
     .references(() => bookmarks.id, { onDelete: "cascade" }),
-  assetType: text("assetType", { enum: ["image", "pdf"] }).notNull(),
+  assetType: text("assetType", {
+    enum: ["image", "pdf", "video", "audio"],
+  }).notNull(),
   assetId: text("assetId").notNull(),
   content: text("content"),
   metadata: text("metadata"),

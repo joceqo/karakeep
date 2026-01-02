@@ -198,14 +198,17 @@ export class Bookmark extends BareBookmark {
       };
     }
     if (bookmark.asset) {
+      const assetRecord = assets.find((a) => a.id == asset.assetId);
       content = {
         type: BookmarkTypes.ASSET,
         assetType: asset.assetType,
         assetId: asset.assetId,
         fileName: asset.fileName,
         sourceUrl: asset.sourceUrl,
-        size: assets.find((a) => a.id == asset.assetId)?.size,
+        size: assetRecord?.size,
         content: includeContent ? asset.content : null,
+        conversionStatus: assetRecord?.conversionStatus,
+        conversionProgress: assetRecord?.conversionProgress,
       };
     }
 
@@ -705,7 +708,9 @@ export class Bookmark extends BareBookmark {
           switch (content.assetType) {
             case "image":
               return `${getPublicSignedAssetUrl(content.assetId)}`;
-            case "pdf": {
+            case "pdf":
+            case "video":
+            case "audio": {
               const screenshotAssetId = this.bookmark.assets.find(
                 (r) => r.assetType === "assetScreenshot",
               )?.id;

@@ -212,6 +212,12 @@ const allEnv = z.object({
   // Database configuration
   DB_WAL_MODE: stringBool("false"),
 
+  // FFmpeg media conversion service
+  FFMPEG_SERVICE_URL: z.string().url().optional(),
+  FFMPEG_API_TOKEN: z.string().optional(),
+  MEDIA_CONVERSION_NUM_WORKERS: z.coerce.number().default(1),
+  MEDIA_CONVERSION_JOB_TIMEOUT_SEC: z.coerce.number().default(600),
+
   // OpenTelemetry tracing configuration
   OTEL_TRACING_ENABLED: stringBool("false"),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
@@ -376,6 +382,13 @@ const serverConfigSchema = allEnv.transform((val, ctx) => {
     },
     ruleEngine: {
       numWorkers: val.RULE_ENGINE_NUM_WORKERS,
+    },
+    mediaConversion: {
+      enabled: !!val.FFMPEG_SERVICE_URL && !!val.FFMPEG_API_TOKEN,
+      serviceUrl: val.FFMPEG_SERVICE_URL,
+      apiToken: val.FFMPEG_API_TOKEN,
+      numWorkers: val.MEDIA_CONVERSION_NUM_WORKERS,
+      jobTimeoutSec: val.MEDIA_CONVERSION_JOB_TIMEOUT_SEC,
     },
     assetStore: {
       type: val.ASSET_STORE_S3_ENDPOINT

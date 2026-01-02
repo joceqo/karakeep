@@ -353,10 +353,14 @@ async function run(req: DequeuedJob<AssetPreprocessingRequest>) {
       anythingChanged ||= extractedText || extractedScreenshot;
       break;
     }
-    default:
-      throw new Error(
-        `[assetPreprocessing][${jobId}] Unsupported bookmark type`,
+    case "video":
+    case "audio": {
+      // Video and audio don't need preprocessing - they're handled by the media conversion worker
+      logger.info(
+        `[assetPreprocessing][${jobId}] Skipping preprocessing for ${bookmark.asset.assetType} asset`,
       );
+      break;
+    }
   }
 
   // Propagate priority to child jobs
