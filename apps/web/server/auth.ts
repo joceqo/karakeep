@@ -118,21 +118,38 @@ const providers: Provider[] = [
 ];
 
 const oauth = serverConfig.auth.oauth;
+console.log("[AUTH] OAuth config:", {
+  wellKnownUrl: oauth.wellKnownUrl,
+  clientId: oauth.clientId,
+  clientSecret: oauth.clientSecret
+    ? "***" + oauth.clientSecret.slice(-4)
+    : "MISSING",
+  scope: oauth.scope,
+  name: oauth.name,
+});
 if (oauth.wellKnownUrl) {
   providers.push({
     id: "custom",
     name: oauth.name,
     type: "oauth",
     wellKnown: oauth.wellKnownUrl,
+    idToken: true,
     authorization: { params: { scope: oauth.scope } },
     clientId: oauth.clientId,
     clientSecret: oauth.clientSecret,
     allowDangerousEmailAccountLinking: oauth.allowDangerousEmailAccountLinking,
     checks: ["pkce", "state"],
+    client: {
+      id_token_signed_response_alg: "ES384",
+    },
     httpOptions: {
       timeout: oauth.timeout,
     },
     async profile(profile: Record<string, string>) {
+      console.log(
+        "[AUTH] OAuth profile received:",
+        JSON.stringify(profile, null, 2),
+      );
       const [admin, firstUser] = await Promise.all([
         isAdmin(profile.email),
         isFirstUser(),
@@ -154,6 +171,15 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  debug: process.env.NODE_ENV === "development",
+  logger: {
+    error(code, metadata) {
+      console.error("[AUTH ERROR]", code, metadata);
+    },
+    warn(code) {
+      console.warn("[AUTH WARN]", code);
+    },
+  },
   pages: {
     signIn: "/signin",
     signOut: "/signin",
@@ -162,6 +188,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user: credUser, credentials, profile }) {
+      console.log("[AUTH] signIn callback:", { user: credUser, profile });
       const email = credUser.email || profile?.email;
       if (!email) {
         throw new Error("Provider didn't provide an email during signin");

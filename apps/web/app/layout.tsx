@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 import { loadAllPlugins } from "@karakeep/shared-server";
@@ -60,6 +61,12 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className={inter.className}>
+        {process.env.NODE_ENV === "development" && (
+          <Script
+            src="https://unpkg.com/react-grab/dist/index.global.js"
+            strategy="afterInteractive"
+          />
+        )}
         <NuqsAdapter>
           <Providers
             session={session}
