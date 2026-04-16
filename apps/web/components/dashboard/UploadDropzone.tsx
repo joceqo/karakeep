@@ -32,8 +32,14 @@ export function useUploadAsset() {
 
   const { mutateAsync: runUploadAsset } = useUpload({
     onSuccess: async (resp) => {
-      const assetType =
-        resp.contentType === "application/pdf" ? "pdf" : "image";
+      let assetType: "image" | "pdf" | "video" | "audio" = "image";
+      if (resp.contentType === "application/pdf") {
+        assetType = "pdf";
+      } else if (resp.contentType.startsWith("video/")) {
+        assetType = "video";
+      } else if (resp.contentType.startsWith("audio/")) {
+        assetType = "audio";
+      }
       await createBookmark({
         ...resp,
         type: BookmarkTypes.ASSET,
@@ -157,7 +163,7 @@ export default function UploadDropzone({
               </div>
             ) : (
               <p className="text-2xl font-bold text-gray-700">
-                Drop Your Image / PDF / Markdown file
+                Drop Your Image / Video / Audio / PDF / Markdown file
               </p>
             )}
           </div>

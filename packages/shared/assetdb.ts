@@ -29,15 +29,83 @@ export const enum ASSET_TYPES {
   APPLICATION_ZIP = "application/zip",
   TEXT_HTML = "text/html",
 
+  // Playable video types (no conversion needed)
   VIDEO_MP4 = "video/mp4",
   VIDEO_WEBM = "video/webm",
+
+  // Video types that need conversion to mp4
   VIDEO_MKV = "video/x-matroska",
+  VIDEO_MOV = "video/quicktime",
+  VIDEO_AVI = "video/x-msvideo",
+  VIDEO_WMV = "video/x-ms-wmv",
+  VIDEO_3GP = "video/3gpp",
+  VIDEO_FLV = "video/x-flv",
+
+  // Playable audio types (no conversion needed)
+  AUDIO_MP3 = "audio/mpeg",
+  AUDIO_WAV = "audio/wav",
+  AUDIO_OGG = "audio/ogg",
+  AUDIO_WEBM = "audio/webm",
+
+  // Audio types that need conversion to mp3
+  AUDIO_FLAC = "audio/flac",
+  AUDIO_M4A = "audio/mp4",
+  AUDIO_M4A_X = "audio/x-m4a",
+  AUDIO_AAC = "audio/aac",
+  AUDIO_AIFF = "audio/x-aiff",
+  AUDIO_AMR = "audio/amr",
 }
 
-export const VIDEO_ASSET_TYPES: Set<string> = new Set<string>([
+// Video types that browsers can play natively
+export const PLAYABLE_VIDEO_TYPES: Set<string> = new Set<string>([
   ASSET_TYPES.VIDEO_MP4,
   ASSET_TYPES.VIDEO_WEBM,
+]);
+
+// Video types that need conversion to mp4
+export const CONVERTIBLE_VIDEO_TYPES: Set<string> = new Set<string>([
   ASSET_TYPES.VIDEO_MKV,
+  ASSET_TYPES.VIDEO_MOV,
+  ASSET_TYPES.VIDEO_AVI,
+  ASSET_TYPES.VIDEO_WMV,
+  ASSET_TYPES.VIDEO_3GP,
+  ASSET_TYPES.VIDEO_FLV,
+]);
+
+// All video types (playable + convertible)
+export const VIDEO_ASSET_TYPES: Set<string> = new Set<string>([
+  ...PLAYABLE_VIDEO_TYPES,
+  ...CONVERTIBLE_VIDEO_TYPES,
+]);
+
+// Audio types that browsers can play natively
+export const PLAYABLE_AUDIO_TYPES: Set<string> = new Set<string>([
+  ASSET_TYPES.AUDIO_MP3,
+  ASSET_TYPES.AUDIO_WAV,
+  ASSET_TYPES.AUDIO_OGG,
+  ASSET_TYPES.AUDIO_WEBM,
+]);
+
+// Audio types that need conversion to mp3
+export const CONVERTIBLE_AUDIO_TYPES: Set<string> = new Set<string>([
+  ASSET_TYPES.AUDIO_FLAC,
+  ASSET_TYPES.AUDIO_M4A,
+  ASSET_TYPES.AUDIO_M4A_X,
+  ASSET_TYPES.AUDIO_AAC,
+  ASSET_TYPES.AUDIO_AIFF,
+  ASSET_TYPES.AUDIO_AMR,
+]);
+
+// All audio types (playable + convertible)
+export const AUDIO_ASSET_TYPES: Set<string> = new Set<string>([
+  ...PLAYABLE_AUDIO_TYPES,
+  ...CONVERTIBLE_AUDIO_TYPES,
+]);
+
+// All types that need media conversion
+export const NEEDS_CONVERSION_TYPES: Set<string> = new Set<string>([
+  ...CONVERTIBLE_VIDEO_TYPES,
+  ...CONVERTIBLE_AUDIO_TYPES,
 ]);
 
 export const IMAGE_ASSET_TYPES: Set<string> = new Set<string>([
@@ -51,6 +119,7 @@ export const IMAGE_ASSET_TYPES: Set<string> = new Set<string>([
 export const SUPPORTED_UPLOAD_ASSET_TYPES: Set<string> = new Set<string>([
   ...IMAGE_ASSET_TYPES,
   ...VIDEO_ASSET_TYPES,
+  ...AUDIO_ASSET_TYPES,
   ASSET_TYPES.TEXT_HTML,
   ASSET_TYPES.APPLICATION_PDF,
 ]);
@@ -58,6 +127,8 @@ export const SUPPORTED_UPLOAD_ASSET_TYPES: Set<string> = new Set<string>([
 // The assets that we allow as a bookmark of type asset
 export const SUPPORTED_BOOKMARK_ASSET_TYPES: Set<string> = new Set<string>([
   ...IMAGE_ASSET_TYPES,
+  ...VIDEO_ASSET_TYPES,
+  ...AUDIO_ASSET_TYPES,
   ASSET_TYPES.APPLICATION_PDF,
 ]);
 
@@ -65,7 +136,6 @@ export const SUPPORTED_BOOKMARK_ASSET_TYPES: Set<string> = new Set<string>([
 export const SUPPORTED_ASSET_TYPES: Set<string> = new Set<string>([
   ...SUPPORTED_UPLOAD_ASSET_TYPES,
   ASSET_TYPES.TEXT_HTML,
-  ASSET_TYPES.VIDEO_MP4,
   ASSET_TYPES.APPLICATION_ZIP,
 ]);
 

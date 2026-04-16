@@ -70,12 +70,16 @@ export type ZBookmarkedText = z.infer<typeof zBookmarkedTextSchema>;
 
 export const zBookmarkedAssetSchema = z.object({
   type: z.literal(BookmarkTypes.ASSET),
-  assetType: z.enum(["image", "pdf"]),
+  assetType: z.enum(["image", "pdf", "video", "audio"]),
   assetId: z.string(),
   fileName: z.string().nullish(),
   sourceUrl: z.string().nullish(),
   size: z.number().nullish(),
   content: z.string().nullish(),
+  conversionStatus: z
+    .enum(["pending", "converting", "success", "failure"])
+    .nullish(),
+  conversionProgress: z.number().nullish(),
 });
 export type ZBookmarkedAsset = z.infer<typeof zBookmarkedAssetSchema>;
 
@@ -181,7 +185,7 @@ export const zNewBookmarkRequestSchema = z
       }),
       z.object({
         type: z.literal(BookmarkTypes.ASSET),
-        assetType: z.enum(["image", "pdf"]),
+        assetType: z.enum(["image", "pdf", "video", "audio"]),
         assetId: z.string(),
         fileName: z.string().optional(),
         sourceUrl: z.string().optional(),
@@ -292,7 +296,7 @@ export const zPublicBookmarkSchema = z.object({
     }),
     z.object({
       type: z.literal(BookmarkTypes.ASSET),
-      assetType: z.enum(["image", "pdf"]),
+      assetType: z.enum(["image", "pdf", "video", "audio"]),
       assetId: z.string(),
       assetUrl: z.string(),
       fileName: z.string().nullish(),

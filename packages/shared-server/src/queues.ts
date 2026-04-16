@@ -250,3 +250,20 @@ export const BackupQueue = QUEUE_CLIENT.createQueue<ZBackupRequest>(
     keepFailedJobs: false,
   },
 );
+
+// Media Conversion Worker
+export const zMediaConversionRequestSchema = z.object({
+  assetId: z.string(),
+  bookmarkId: z.string(),
+  targetFormat: z.enum(["mp3", "mp4", "webm"]),
+});
+export type ZMediaConversionRequest = z.infer<
+  typeof zMediaConversionRequestSchema
+>;
+export const MediaConversionQueue =
+  QUEUE_CLIENT.createQueue<ZMediaConversionRequest>("media_conversion_queue", {
+    defaultJobArgs: {
+      numRetries: 3,
+    },
+    keepFailedJobs: false,
+  });

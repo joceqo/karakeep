@@ -60,8 +60,14 @@ export function useUploadAsset(
     },
     onSuccess: (resp) => {
       const assetId = resp.assetId;
-      const assetType =
-        resp.contentType === "application/pdf" ? "pdf" : "image";
+      let assetType: "image" | "pdf" | "video" | "audio" = "image";
+      if (resp.contentType === "application/pdf") {
+        assetType = "pdf";
+      } else if (resp.contentType.startsWith("video/")) {
+        assetType = "video";
+      } else if (resp.contentType.startsWith("audio/")) {
+        assetType = "audio";
+      }
       createBookmark({
         type: BookmarkTypes.ASSET,
         assetId,

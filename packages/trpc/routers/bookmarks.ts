@@ -18,13 +18,17 @@ import {
 import {
   AssetPreprocessingQueue,
   LinkCrawlerQueue,
+  MediaConversionQueue,
   OpenAIQueue,
   QuotaService,
   triggerRuleEngineOnEvent,
   triggerSearchReindex,
   triggerWebhook,
 } from "@karakeep/shared-server";
-import { SUPPORTED_BOOKMARK_ASSET_TYPES } from "@karakeep/shared/assetdb";
+import {
+  NEEDS_CONVERSION_TYPES,
+  SUPPORTED_BOOKMARK_ASSET_TYPES,
+} from "@karakeep/shared/assetdb";
 import serverConfig from "@karakeep/shared/config";
 import { InferenceClientFactory } from "@karakeep/shared/inference";
 import { buildSummaryPrompt } from "@karakeep/shared/prompts";
@@ -157,6 +161,9 @@ export const bookmarksAppRouter = router({
                 summary: input.summary,
                 createdAt: input.createdAt,
                 source: input.source,
+                // Only links and text currently support tagging. Assets don't trigger AI tagging.
+                taggingStatus:
+                  input.type === BookmarkTypes.ASSET ? null : "pending",
                 // Only links currently support summarization. Let's set the status to null for other types for now.
                 summarizationStatus:
                   input.type === BookmarkTypes.LINK ? "pending" : null,
@@ -217,18 +224,6 @@ export const bookmarksAppRouter = router({
               break;
             }
             case BookmarkTypes.ASSET: {
-              const [asset] = await tx
-                .insert(bookmarkAssets)
-                .values({
-                  id: bookmark.id,
-                  assetType: input.assetType,
-                  assetId: input.assetId,
-                  content: null,
-                  metadata: null,
-                  fileName: input.fileName ?? null,
-                  sourceUrl: null,
-                })
-                .returning();
               const uploadedAsset = await Asset.fromId(ctx, input.assetId);
               uploadedAsset.ensureOwnership();
               if (
@@ -242,11 +237,31 @@ export const bookmarksAppRouter = router({
                   message: "Unsupported asset type",
                 });
               }
+
+              // Check if this asset needs conversion
+              const needsConversion = NEEDS_CONVERSION_TYPES.has(
+                uploadedAsset.asset.contentType,
+              );
+
+              const [asset] = await tx
+                .insert(bookmarkAssets)
+                .values({
+                  id: bookmark.id,
+                  assetType: input.assetType,
+                  assetId: input.assetId,
+                  content: null,
+                  metadata: null,
+                  fileName: input.fileName ?? null,
+                  sourceUrl: null,
+                })
+                .returning();
+
               await tx
                 .update(assets)
                 .set({
                   bookmarkId: bookmark.id,
                   assetType: AssetTypes.BOOKMARK_ASSET,
+                  conversionStatus: needsConversion ? "pending" : null,
                 })
                 .where(
                   and(
@@ -259,7 +274,20 @@ export const bookmarksAppRouter = router({
                 assetType: asset.assetType,
                 assetId: asset.assetId,
               };
-              break;
+              // Return info needed for conversion queueing
+              return {
+                alreadyExists: false,
+                tags: [] as ZBookmarkTags[],
+                assets: [],
+                content,
+                ...bookmark,
+                _conversionInfo: needsConversion
+                  ? {
+                      assetId: input.assetId,
+                      contentType: uploadedAsset.asset.contentType,
+                    }
+                  : null,
+              };
             }
           }
 
@@ -269,6 +297,7 @@ export const bookmarksAppRouter = router({
             assets: [],
             content,
             ...bookmark,
+            _conversionInfo: null,
           };
         },
         {
@@ -309,6 +338,7 @@ export const bookmarksAppRouter = router({
           break;
         }
         case BookmarkTypes.ASSET: {
+          // Queue preprocessing for images/PDFs
           await AssetPreprocessingQueue.enqueue(
             {
               bookmarkId: bookmark.id,
@@ -316,6 +346,25 @@ export const bookmarksAppRouter = router({
             },
             enqueueOpts,
           );
+
+          // Queue media conversion if needed
+          if (
+            bookmark._conversionInfo &&
+            serverConfig.mediaConversion.enabled
+          ) {
+            const targetFormat =
+              bookmark._conversionInfo.contentType.startsWith("audio/")
+                ? "mp3"
+                : "mp4";
+            await MediaConversionQueue.enqueue(
+              {
+                assetId: bookmark._conversionInfo.assetId,
+                bookmarkId: bookmark.id,
+                targetFormat,
+              },
+              enqueueOpts,
+            );
+          }
           break;
         }
       }

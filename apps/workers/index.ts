@@ -19,6 +19,7 @@ import { BackupSchedulingWorker, BackupWorker } from "./workers/backupWorker";
 import { CrawlerWorker } from "./workers/crawlerWorker";
 import { FeedRefreshingWorker, FeedWorker } from "./workers/feedWorker";
 import { OpenAiWorker } from "./workers/inference/inferenceWorker";
+import { MediaConversionWorker } from "./workers/mediaConversionWorker";
 import { RuleEngineWorker } from "./workers/ruleEngineWorker";
 import { SearchIndexingWorker } from "./workers/searchWorker";
 import { VideoWorker } from "./workers/videoWorker";
@@ -35,6 +36,7 @@ const workerBuilders = {
   webhook: () => WebhookWorker.build(),
   ruleEngine: () => RuleEngineWorker.build(),
   backup: () => BackupWorker.build(),
+  mediaConversion: () => MediaConversionWorker.build(),
 } as const;
 
 type WorkerName = keyof typeof workerBuilders;

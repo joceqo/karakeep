@@ -102,6 +102,42 @@ function ImageContentSection({ bookmark }: { bookmark: ZBookmark }) {
   );
 }
 
+function VideoContentSection({ bookmark }: { bookmark: ZBookmark }) {
+  if (bookmark.content.type != BookmarkTypes.ASSET) {
+    throw new Error("Invalid content type");
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- User-uploaded videos don't have caption tracks */}
+      <video
+        controls
+        className="max-h-full max-w-full"
+        src={getAssetUrl(bookmark.content.assetId)}
+      >
+        Your browser does not support the video element.
+      </video>
+    </div>
+  );
+}
+
+function AudioContentSection({ bookmark }: { bookmark: ZBookmark }) {
+  if (bookmark.content.type != BookmarkTypes.ASSET) {
+    throw new Error("Invalid content type");
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- User-uploaded audio don't have caption tracks */}
+      <audio
+        controls
+        className="w-full max-w-md"
+        src={getAssetUrl(bookmark.content.assetId)}
+      >
+        Your browser does not support the audio element.
+      </audio>
+    </div>
+  );
+}
+
 export function AssetContentSection({ bookmark }: { bookmark: ZBookmark }) {
   if (bookmark.content.type != BookmarkTypes.ASSET) {
     throw new Error("Invalid content type");
@@ -111,7 +147,13 @@ export function AssetContentSection({ bookmark }: { bookmark: ZBookmark }) {
       return <ImageContentSection bookmark={bookmark} />;
     case "pdf":
       return <PDFContentSection bookmark={bookmark} />;
-    default:
+    case "video":
+      return <VideoContentSection bookmark={bookmark} />;
+    case "audio":
+      return <AudioContentSection bookmark={bookmark} />;
+    default: {
+      const _exhaustiveCheck: never = bookmark.content.assetType;
       return <div>Unsupported asset type</div>;
+    }
   }
 }
