@@ -96,6 +96,7 @@ export const zBookmarkSourceSchema = z.enum([
   "singlefile",
   "rss",
   "import",
+  "github",
 ]);
 export type ZBookmarkSource = z.infer<typeof zBookmarkSourceSchema>;
 

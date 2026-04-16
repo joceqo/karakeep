@@ -15,6 +15,7 @@ import {
   CreditCard,
   Download,
   GitBranch,
+  Github,
   Image,
   KeyRound,
   Link,
@@ -72,6 +73,11 @@ const settingsSidebarItems = (
       name: t("settings.feeds.rss_subscriptions"),
       icon: <Rss size={18} />,
       path: "/settings/feeds",
+    },
+    {
+      name: "GitHub",
+      icon: <Github size={18} />,
+      path: "/settings/github",
     },
     {
       name: t("settings.backups.backups"),

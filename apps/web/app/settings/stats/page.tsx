@@ -18,6 +18,7 @@ import {
   Code,
   Database,
   FileText,
+  Github,
   Globe,
   Hash,
   Heart,
@@ -73,6 +74,7 @@ function formatSourceName(source: BookmarkSource | null): string {
     singlefile: "SingleFile",
     rss: "RSS Feed",
     import: "Import",
+    github: "GitHub",
   };
   return sourceMap[source];
 }
@@ -96,6 +98,8 @@ function getSourceIcon(source: BookmarkSource | null): React.ReactNode {
       return <Rss {...iconProps} />;
     case "import":
       return <Upload {...iconProps} />;
+    case "github":
+      return <Github {...iconProps} />;
     default:
       return <HelpCircle {...iconProps} />;
   }

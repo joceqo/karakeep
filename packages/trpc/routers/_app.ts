@@ -5,6 +5,7 @@ import { assetsAppRouter } from "./assets";
 import { backupsAppRouter } from "./backups";
 import { bookmarksAppRouter } from "./bookmarks";
 import { feedsAppRouter } from "./feeds";
+import { githubAppRouter } from "./github";
 import { highlightsAppRouter } from "./highlights";
 import { importSessionsRouter } from "./importSessions";
 import { invitesAppRouter } from "./invites";
@@ -26,6 +27,7 @@ export const appRouter = router({
   prompts: promptsAppRouter,
   admin: adminAppRouter,
   feeds: feedsAppRouter,
+  github: githubAppRouter,
   backups: backupsAppRouter,
   highlights: highlightsAppRouter,
   importSessions: importSessionsRouter,

@@ -1,6 +1,6 @@
 import { Adapter, AdapterUser } from "@auth/core/adapters";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import NextAuth, {
   DefaultSession,
   getServerSession,
@@ -222,7 +222,7 @@ export const authOptions: NextAuthOptions = {
 
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
         token.user = {
           id: user.id,
@@ -231,6 +231,59 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           role: user.role ?? "user",
         };
+      }
+      // Persist OAuth tokens so workers/tRPC can access GitHub on the user's behalf
+      // via the Logto Account API. JWT strategy does not auto-populate the accounts
+      // table, so we upsert on each sign-in.
+      if (account && token.user?.id && account.type === "oauth") {
+        try {
+          const providerAccountId =
+            account.providerAccountId ??
+            (profile as { sub?: string } | undefined)?.sub;
+          if (providerAccountId) {
+            const values = {
+              userId: token.user.id,
+              type: "oauth" as const,
+              provider: account.provider,
+              providerAccountId,
+              access_token: account.access_token ?? null,
+              refresh_token: account.refresh_token ?? null,
+              expires_at: account.expires_at ?? null,
+              token_type: account.token_type ?? null,
+              scope: account.scope ?? null,
+              id_token: account.id_token ?? null,
+              session_state:
+                typeof account.session_state === "string"
+                  ? account.session_state
+                  : null,
+            };
+            const existing = await db
+              .select({ userId: accounts.userId })
+              .from(accounts)
+              .where(
+                and(
+                  eq(accounts.provider, account.provider),
+                  eq(accounts.providerAccountId, providerAccountId),
+                ),
+              )
+              .limit(1);
+            if (existing.length > 0) {
+              await db
+                .update(accounts)
+                .set(values)
+                .where(
+                  and(
+                    eq(accounts.provider, account.provider),
+                    eq(accounts.providerAccountId, providerAccountId),
+                  ),
+                );
+            } else {
+              await db.insert(accounts).values(values);
+            }
+          }
+        } catch (err) {
+          console.error("[AUTH] Failed to persist OAuth account tokens:", err);
+        }
       }
       return token;
     },

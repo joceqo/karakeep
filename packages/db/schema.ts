@@ -215,6 +215,7 @@ export const bookmarks = sqliteTable(
         "singlefile",
         "rss",
         "import",
+        "github",
       ],
     }),
   },
@@ -860,6 +861,78 @@ export const importSessionBookmarks = sqliteTable(
   ],
 );
 
+export const githubWatchedRepos = sqliteTable(
+  "githubWatchedRepos",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
+    repo: text("repo").notNull(),
+    createdAt: createdAtField(),
+    lastFetchedAt: integer("lastFetchedAt", { mode: "timestamp" }),
+  },
+  (w) => [
+    index("githubWatchedRepos_userId_idx").on(w.userId),
+    unique().on(w.userId, w.owner, w.repo),
+  ],
+);
+
+export const githubActivityEvents = sqliteTable(
+  "githubActivityEvents",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    watchedRepoId: text("watchedRepoId").references(
+      () => githubWatchedRepos.id,
+      { onDelete: "cascade" },
+    ),
+    githubEventId: text("githubEventId").notNull(),
+    eventType: text("eventType").notNull(),
+    owner: text("owner").notNull(),
+    repo: text("repo").notNull(),
+    actor: text("actor"),
+    actorAvatarUrl: text("actorAvatarUrl"),
+    title: text("title"),
+    url: text("url"),
+    payload: text("payload"),
+    occurredAt: integer("occurredAt", { mode: "timestamp" }).notNull(),
+    createdAt: createdAtField(),
+  },
+  (e) => [
+    index("githubActivityEvents_userId_occurredAt_idx").on(
+      e.userId,
+      e.occurredAt,
+    ),
+    unique().on(e.userId, e.githubEventId),
+  ],
+);
+
+export const githubSyncState = sqliteTable("githubSyncState", {
+  userId: text("userId")
+    .notNull()
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lastStarsSyncAt: integer("lastStarsSyncAt", { mode: "timestamp" }),
+  lastStarsCursor: text("lastStarsCursor"),
+  starsSyncStatus: text("starsSyncStatus", {
+    enum: ["idle", "running", "success", "failure"],
+  })
+    .notNull()
+    .default("idle"),
+  starsSyncError: text("starsSyncError"),
+  lastActivitySyncAt: integer("lastActivitySyncAt", { mode: "timestamp" }),
+});
+
 // Relations
 
 export const userRelations = relations(users, ({ many, one }) => ({
@@ -1106,3 +1179,38 @@ export const backupsRelations = relations(backupsTable, ({ one }) => ({
     references: [assets.id],
   }),
 }));
+
+export const githubWatchedReposRelations = relations(
+  githubWatchedRepos,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [githubWatchedRepos.userId],
+      references: [users.id],
+    }),
+    events: many(githubActivityEvents),
+  }),
+);
+
+export const githubActivityEventsRelations = relations(
+  githubActivityEvents,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [githubActivityEvents.userId],
+      references: [users.id],
+    }),
+    watchedRepo: one(githubWatchedRepos, {
+      fields: [githubActivityEvents.watchedRepoId],
+      references: [githubWatchedRepos.id],
+    }),
+  }),
+);
+
+export const githubSyncStateRelations = relations(
+  githubSyncState,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [githubSyncState.userId],
+      references: [users.id],
+    }),
+  }),
+);
