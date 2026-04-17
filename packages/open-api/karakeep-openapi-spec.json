@@ -109,7 +109,8 @@
               "extension",
               "singlefile",
               "rss",
-              "import"
+              "import",
+              "github"
             ]
           },
           "userId": {
@@ -771,7 +772,8 @@
                           "extension",
                           "singlefile",
                           "rss",
-                          "import"
+                          "import",
+                          "github"
                         ]
                       }
                     }
@@ -1237,7 +1239,8 @@
                         "extension",
                         "singlefile",
                         "rss",
-                        "import"
+                        "import",
+                        "github"
                       ]
                     },
                     "userId": {
@@ -1365,7 +1368,8 @@
                         "extension",
                         "singlefile",
                         "rss",
-                        "import"
+                        "import",
+                        "github"
                       ]
                     },
                     "userId": {
@@ -3479,7 +3483,8 @@
                               "extension",
                               "singlefile",
                               "rss",
-                              "import"
+                              "import",
+                              "github"
                             ]
                           },
                           "count": {

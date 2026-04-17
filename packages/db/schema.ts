@@ -917,6 +917,40 @@ export const githubActivityEvents = sqliteTable(
   ],
 );
 
+export const githubRepoMeta = sqliteTable(
+  "githubRepoMeta",
+  {
+    bookmarkId: text("bookmarkId")
+      .notNull()
+      .primaryKey()
+      .references(() => bookmarks.id, { onDelete: "cascade" }),
+    githubId: integer("githubId").notNull(),
+    owner: text("owner").notNull(),
+    repo: text("repo").notNull(),
+    fullName: text("fullName").notNull(),
+    description: text("description"),
+    homepage: text("homepage"),
+    language: text("language"),
+    topics: text("topics"),
+    stars: integer("stars").notNull().default(0),
+    forks: integer("forks").notNull().default(0),
+    openIssues: integer("openIssues").notNull().default(0),
+    archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+    fork: integer("fork", { mode: "boolean" }).notNull().default(false),
+    pushedAt: integer("pushedAt", { mode: "timestamp" }),
+    repoUpdatedAt: integer("repoUpdatedAt", { mode: "timestamp" }),
+    starredAt: integer("starredAt", { mode: "timestamp" }),
+    syncedAt: integer("syncedAt", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("githubRepoMeta_stars_idx").on(t.stars),
+    index("githubRepoMeta_language_idx").on(t.language),
+    index("githubRepoMeta_owner_idx").on(t.owner),
+  ],
+);
+
 export const githubSyncState = sqliteTable("githubSyncState", {
   userId: text("userId")
     .notNull()

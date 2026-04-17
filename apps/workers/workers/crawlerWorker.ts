@@ -1633,6 +1633,7 @@ async function runCrawler(
   const {
     url,
     userId,
+    source,
     screenshotAssetId: oldScreenshotAssetId,
     pdfAssetId: oldPdfAssetId,
     imageAssetId: oldImageAssetId,
@@ -1640,6 +1641,13 @@ async function runCrawler(
     contentAssetId: oldContentAssetId,
     precrawledArchiveAssetId,
   } = await getBookmarkDetails(bookmarkId);
+
+  if (source === "github") {
+    logger.info(
+      `[Crawler][${jobId}] Skipping crawl for github-sourced bookmark ${bookmarkId} (metadata pre-filled)`,
+    );
+    return { status: "completed" };
+  }
 
   await checkDomainRateLimit(url, jobId);
 

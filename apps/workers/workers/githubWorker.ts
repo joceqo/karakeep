@@ -7,13 +7,20 @@ import { withWorkerTracing } from "workerTracing";
 import type { ZGithubSyncRequest } from "@karakeep/shared-server";
 import { db } from "@karakeep/db";
 import {
+  bookmarkLinks,
+  bookmarks,
+  bookmarkTags,
   githubActivityEvents,
+  githubRepoMeta,
   githubSyncState,
   githubWatchedRepos,
+  tagsOnBookmarks,
   users,
 } from "@karakeep/db/schema";
 import {
+  extractFirstReadmeImage,
   fetchRepoEvents,
+  fetchRepoReadme,
   fetchStarredPage,
   getGithubToken,
   GithubApiError,
@@ -28,7 +35,13 @@ import { DequeuedJob, getQueueClient } from "@karakeep/shared/queueing";
 import { BookmarkTypes } from "@karakeep/shared/types/bookmarks";
 
 const STARS_PAGE_SIZE = 100;
-const MAX_STARS_PAGES_PER_RUN = 10;
+// Safety cap: stop after this many pages in one run so the worker can yield
+// and another run picks up the rest. README fetch + DB writes are the slow
+// part (~500ms/star), so 2 pages (~100s) fits comfortably under the 120s
+// worker timeout.
+const MAX_STARS_PAGES_PER_RUN = 2;
+// Time budget per run in ms (used in addition to the page cap).
+const STARS_RUN_BUDGET_MS = 80_000;
 
 async function upsertSyncState(
   userId: string,
@@ -57,18 +70,35 @@ async function syncStars(userId: string, jobId: string) {
     return;
   }
 
+  const prevState = await db.query.githubSyncState.findFirst({
+    where: eq(githubSyncState.userId, userId),
+  });
+  const startPage = Math.max(
+    1,
+    parseInt(prevState?.lastStarsCursor ?? "1", 10) || 1,
+  );
+  const runStartMs = Date.now();
+
   await upsertSyncState(userId, {
     starsSyncStatus: "running",
     starsSyncError: null,
   });
 
   const trpc = await buildImpersonatingTRPCClient(userId);
-  let page = 1;
+  let page = startPage;
+  let pagesThisRun = 0;
   let totalCreated = 0;
   let totalSkipped = 0;
+  let done = false;
 
   try {
-    while (page <= MAX_STARS_PAGES_PER_RUN) {
+    while (pagesThisRun < MAX_STARS_PAGES_PER_RUN) {
+      if (Date.now() - runStartMs > STARS_RUN_BUDGET_MS) {
+        logger.info(
+          `[github][${jobId}] Time budget reached at page ${page}; will resume in next run`,
+        );
+        break;
+      }
       const quotaResult = await QuotaService.canCreateBookmark(db, userId);
       if (!quotaResult.result) {
         logger.info(
@@ -90,16 +120,96 @@ async function syncStars(userId: string, jobId: string) {
       for (const star of stars) {
         try {
           const repo = star.repo;
+          const starredAt = new Date(star.starred_at);
           const result = await trpc.bookmarks.createBookmark({
             type: BookmarkTypes.LINK,
             url: repo.html_url,
             title: repo.full_name,
             source: "github",
+            createdAt: starredAt,
           });
           if (result.alreadyExists) {
             totalSkipped++;
           } else {
             totalCreated++;
+          }
+          const readmeMd = await fetchRepoReadme(
+            tokenInfo.token,
+            repo.owner.login,
+            repo.name,
+          );
+          const readmeImage = readmeMd
+            ? extractFirstReadmeImage(readmeMd, repo.owner.login, repo.name)
+            : null;
+          await db
+            .update(bookmarkLinks)
+            .set({
+              title: repo.full_name,
+              description: repo.description,
+              author: repo.owner.login,
+              publisher: "GitHub",
+              imageUrl: readmeImage ?? repo.owner.avatar_url,
+              favicon: "https://github.com/favicon.ico",
+              datePublished: new Date(repo.updated_at),
+              crawledAt: new Date(),
+              crawlStatus: "success",
+              crawlStatusCode: 200,
+            })
+            .where(eq(bookmarkLinks.id, result.id));
+          await db
+            .update(bookmarks)
+            .set({ taggingStatus: "success", summarizationStatus: "success" })
+            .where(eq(bookmarks.id, result.id));
+          const metaValues = {
+            bookmarkId: result.id,
+            githubId: repo.id,
+            owner: repo.owner.login,
+            repo: repo.name,
+            fullName: repo.full_name,
+            description: repo.description,
+            homepage: repo.homepage,
+            language: repo.language,
+            topics: repo.topics ? JSON.stringify(repo.topics) : null,
+            stars: repo.stargazers_count,
+            forks: repo.forks_count,
+            openIssues: 0,
+            archived: repo.archived,
+            fork: repo.fork,
+            pushedAt: new Date(repo.pushed_at),
+            repoUpdatedAt: new Date(repo.updated_at),
+            starredAt,
+            syncedAt: new Date(),
+          };
+          await db
+            .insert(githubRepoMeta)
+            .values(metaValues)
+            .onConflictDoUpdate({
+              target: githubRepoMeta.bookmarkId,
+              set: metaValues,
+            });
+          const tagNames = [
+            ...(repo.topics ?? []),
+            ...(repo.language ? [repo.language.toLowerCase()] : []),
+          ].slice(0, 20);
+          for (const name of tagNames) {
+            const [tag] = await db
+              .insert(bookmarkTags)
+              .values({ userId, name })
+              .onConflictDoUpdate({
+                target: [bookmarkTags.userId, bookmarkTags.name],
+                set: { name },
+              })
+              .returning({ id: bookmarkTags.id });
+            if (tag) {
+              await db
+                .insert(tagsOnBookmarks)
+                .values({
+                  bookmarkId: result.id,
+                  tagId: tag.id,
+                  attachedBy: "ai",
+                })
+                .onConflictDoNothing();
+            }
           }
         } catch (err) {
           logger.warn(
@@ -108,18 +218,43 @@ async function syncStars(userId: string, jobId: string) {
         }
       }
 
-      if (stars.length < STARS_PAGE_SIZE) break;
+      pagesThisRun++;
+      if (stars.length < STARS_PAGE_SIZE) {
+        done = true;
+        break;
+      }
       page++;
     }
 
-    await upsertSyncState(userId, {
-      starsSyncStatus: "success",
-      starsSyncError: null,
-      lastStarsSyncAt: new Date(),
-    });
-    logger.info(
-      `[github][${jobId}] Stars sync for user ${userId} complete: created=${totalCreated} skipped=${totalSkipped}`,
-    );
+    if (done) {
+      await upsertSyncState(userId, {
+        starsSyncStatus: "success",
+        starsSyncError: null,
+        lastStarsSyncAt: new Date(),
+        lastStarsCursor: null,
+      });
+      logger.info(
+        `[github][${jobId}] Stars sync complete: created=${totalCreated} skipped=${totalSkipped} (final page ${page})`,
+      );
+    } else {
+      const nextPage = page + 1;
+      await upsertSyncState(userId, {
+        starsSyncStatus: "running",
+        starsSyncError: null,
+        lastStarsSyncAt: new Date(),
+        lastStarsCursor: String(nextPage),
+      });
+      await GithubSyncQueue.enqueue(
+        { kind: "stars", userId },
+        {
+          groupId: userId,
+          idempotencyKey: `github-stars-${userId}-resume-${nextPage}`,
+        },
+      );
+      logger.info(
+        `[github][${jobId}] Stars sync chunk done: created=${totalCreated} skipped=${totalSkipped}; next page ${nextPage} enqueued`,
+      );
+    }
   } catch (err) {
     const msg =
       err instanceof GithubApiError

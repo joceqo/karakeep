@@ -87,7 +87,12 @@ function ConnectionStatusCard() {
 
       <div className="mt-4 flex flex-col gap-2 text-sm">
         <div className="flex items-center gap-2">
-          {data?.connected ? (
+          {isLoading || !data ? (
+            <>
+              <RefreshCw className="size-4 animate-spin text-muted-foreground" />
+              <span className="text-muted-foreground">Checking…</span>
+            </>
+          ) : data.connected ? (
             <>
               <CheckCircle className="size-4 text-green-500" />
               <span>Connected to GitHub</span>

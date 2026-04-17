@@ -3,12 +3,15 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+  bookmarkLinks,
+  bookmarks,
   githubActivityEvents,
   githubSyncState,
   githubWatchedRepos,
 } from "@karakeep/db/schema";
 import {
   fetchGist,
+  fetchRepoReadme,
   getGithubToken,
   searchRepos as ghSearchRepos,
   GithubApiError,
@@ -336,5 +339,41 @@ export const githubAppRouter = router({
           occurredAt: e.occurredAt,
         })),
       };
+    }),
+  getRepoReadmeMarkdown: authedProcedure
+    .input(z.object({ bookmarkId: z.string() }))
+    .output(
+      z.object({
+        markdown: z.string().nullable(),
+        owner: z.string().nullable(),
+        repo: z.string().nullable(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const row = await ctx.db
+        .select({
+          source: bookmarks.source,
+          url: bookmarkLinks.url,
+        })
+        .from(bookmarks)
+        .innerJoin(bookmarkLinks, eq(bookmarkLinks.id, bookmarks.id))
+        .where(
+          and(
+            eq(bookmarks.id, input.bookmarkId),
+            eq(bookmarks.userId, ctx.user.id),
+          ),
+        )
+        .get();
+      if (!row || row.source !== "github") {
+        return { markdown: null, owner: null, repo: null };
+      }
+      const match = row.url.match(
+        /^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)/i,
+      );
+      if (!match) return { markdown: null, owner: null, repo: null };
+      const [, owner, repo] = match;
+      const token = await requireGithubToken(ctx.user.id);
+      const md = await fetchRepoReadme(token, owner, repo);
+      return { markdown: md, owner, repo };
     }),
 });

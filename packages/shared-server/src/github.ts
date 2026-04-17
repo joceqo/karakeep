@@ -18,10 +18,10 @@ interface LogtoTokenRefreshResponse {
 }
 
 interface LogtoAccountApiAccessTokenResponse {
-  accessToken?: string;
-  tokenType?: string;
+  access_token?: string;
+  token_type?: string;
   scope?: string;
-  expiresAt?: number;
+  expires_at?: number;
 }
 
 export interface GithubTokenInfo {
@@ -34,8 +34,8 @@ function getWellKnownBase(): string {
   if (!wellKnown) {
     throw new Error("OAUTH_WELLKNOWN_URL is not configured");
   }
-  // Strip the trailing /.well-known/openid-configuration if present
-  return wellKnown.replace(/\/?\.well-known\/openid-configuration\/?$/, "");
+  const u = new URL(wellKnown);
+  return `${u.protocol}//${u.host}`;
 }
 
 async function fetchOidcConfig(): Promise<{
@@ -163,13 +163,40 @@ export async function getGithubToken(
     );
   }
   const data = (await res.json()) as LogtoAccountApiAccessTokenResponse;
-  if (!data.accessToken) {
+  if (!data.access_token) {
     return null;
   }
   return {
-    token: data.accessToken,
+    token: data.access_token,
     scope: data.scope,
   };
+}
+
+export interface GithubUser {
+  id: number;
+  login: string;
+  avatar_url: string;
+  name: string | null;
+  email: string | null;
+}
+
+export async function fetchGithubUser(
+  token: string,
+): Promise<GithubUser | null> {
+  try {
+    const res = await fetch("https://api.github.com/user", {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "karakeep",
+      },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as GithubUser;
+  } catch {
+    return null;
+  }
 }
 
 export class GithubApiError extends Error {
@@ -244,6 +271,74 @@ export interface GithubRepo {
   homepage: string | null;
   archived: boolean;
   fork: boolean;
+}
+
+/**
+ * Fetches the raw README markdown for a repo.
+ */
+export async function fetchRepoReadme(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<string | null> {
+  try {
+    const res = await githubFetch(token, `/repos/${owner}/${repo}/readme`, {
+      method: "GET",
+      headers: { Accept: "application/vnd.github.raw" },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts the first image URL from README markdown, resolving relative paths.
+ */
+export function extractFirstReadmeImage(
+  markdown: string,
+  owner: string,
+  repo: string,
+): string | null {
+  const mdMatch = markdown.match(/!\[[^\]]*\]\(([^)\s]+)/);
+  const htmlMatch = markdown.match(/<img[^>]+src=["']([^"']+)["']/i);
+  const candidate = mdMatch?.[1] ?? htmlMatch?.[1];
+  if (!candidate) return null;
+  if (/^https?:\/\//i.test(candidate)) {
+    return candidate.replace(
+      /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:raw|blob)\/([^\s)]+)/i,
+      "https://raw.githubusercontent.com/$1/$2/$3",
+    );
+  }
+  const clean = candidate.replace(/^\.?\/?/, "");
+  return `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${clean}`;
+}
+
+/**
+ * Renders markdown to HTML via GitHub's /markdown API, so relative links and
+ * images resolve correctly against the repo.
+ */
+export async function renderMarkdownToHtml(
+  token: string,
+  markdown: string,
+  contextRepo: string,
+): Promise<string | null> {
+  try {
+    const res = await githubFetch(token, `/markdown`, {
+      method: "POST",
+      body: JSON.stringify({
+        text: markdown,
+        mode: "gfm",
+        context: contextRepo,
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchStarredPage(

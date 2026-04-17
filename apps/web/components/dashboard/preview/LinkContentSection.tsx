@@ -40,6 +40,7 @@ import {
 import { READER_FONT_FAMILIES } from "@karakeep/shared/types/readers";
 
 import { contentRendererRegistry } from "./content-renderers";
+import GithubReadmeView from "./GithubReadmeView";
 import ReaderSettingsPopover from "./ReaderSettingsPopover";
 import ReaderView from "./ReaderView";
 
@@ -147,7 +148,15 @@ export default function LinkContentSection({
       </ErrorBoundary>
     );
   } else if (section === "cached") {
-    content = (
+    const isGithub = bookmark.source === "github";
+    content = isGithub ? (
+      <div className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden">
+        <GithubReadmeView
+          bookmarkId={bookmark.id}
+          className="mx-auto w-full min-w-0 max-w-3xl"
+        />
+      </div>
+    ) : (
       <ScrollArea className="h-full">
         <ReaderView
           className="prose mx-auto dark:prose-invert"

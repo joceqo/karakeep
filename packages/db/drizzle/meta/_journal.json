@@ -540,6 +540,13 @@
       "when": 1776376240921,
       "tag": "0076_add_github_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "6",
+      "when": 1776415729702,
+      "tag": "0077_add_github_repo_meta",
+      "breakpoints": true
     }
   ]
 }

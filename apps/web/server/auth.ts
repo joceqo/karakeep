@@ -17,6 +17,7 @@ import {
   users,
   verificationTokens,
 } from "@karakeep/db/schema";
+import { fetchGithubUser, getGithubToken } from "@karakeep/shared-server";
 import serverConfig from "@karakeep/shared/config";
 import { validatePassword } from "@karakeep/trpc/auth";
 import { User } from "@karakeep/trpc/models/users";
@@ -158,6 +159,7 @@ if (oauth.wellKnownUrl) {
         id: profile.sub,
         name: profile.name || profile.email,
         email: profile.email,
+        image: profile.picture || null,
         role: admin || firstUser ? "admin" : "user",
       };
     },
@@ -219,6 +221,13 @@ export const authOptions: NextAuthOptions = {
       // TODO: We're blindly trusting oauth providers to validate emails
       // As such, oauth users can sign in even if email verification is enabled.
       // We might want to change this in the future.
+
+      if (!credentials && credUser.image) {
+        await db
+          .update(users)
+          .set({ image: credUser.image })
+          .where(eq(users.email, email));
+      }
 
       return true;
     },
@@ -283,6 +292,23 @@ export const authOptions: NextAuthOptions = {
           }
         } catch (err) {
           console.error("[AUTH] Failed to persist OAuth account tokens:", err);
+        }
+
+        // Pull GitHub avatar on sign-in so UserAvatar shows the real photo.
+        try {
+          const gh = await getGithubToken(token.user.id);
+          if (gh?.token) {
+            const ghUser = await fetchGithubUser(gh.token);
+            if (ghUser?.avatar_url) {
+              await db
+                .update(users)
+                .set({ image: ghUser.avatar_url })
+                .where(eq(users.id, token.user.id));
+              token.user.image = ghUser.avatar_url;
+            }
+          }
+        } catch (err) {
+          console.error("[AUTH] Failed to fetch GitHub avatar:", err);
         }
       }
       return token;
