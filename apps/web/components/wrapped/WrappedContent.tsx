@@ -10,6 +10,7 @@ import {
   Clock,
   Code,
   FileText,
+  Github,
   Globe,
   Hash,
   Heart,
@@ -68,6 +69,7 @@ function formatSourceName(source: BookmarkSource | null): string {
     singlefile: "SingleFile",
     rss: "RSS Feed",
     import: "Import",
+    github: "GitHub",
   };
   return sourceMap[source];
 }
@@ -91,6 +93,8 @@ function getSourceIcon(source: BookmarkSource | null, className = "h-5 w-5") {
       return <Rss {...iconProps} />;
     case "import":
       return <Upload {...iconProps} />;
+    case "github":
+      return <Github {...iconProps} />;
     default:
       return <Globe {...iconProps} />;
   }

@@ -250,3 +250,26 @@ export const BackupQueue = QUEUE_CLIENT.createQueue<ZBackupRequest>(
     keepFailedJobs: false,
   },
 );
+
+// GitHub integration worker
+export const zGithubSyncRequestSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("stars"),
+    userId: z.string(),
+  }),
+  z.object({
+    kind: z.literal("activity"),
+    userId: z.string(),
+    watchedRepoId: z.string().optional(),
+  }),
+]);
+export type ZGithubSyncRequest = z.infer<typeof zGithubSyncRequestSchema>;
+export const GithubSyncQueue = QUEUE_CLIENT.createQueue<ZGithubSyncRequest>(
+  "github_sync_queue",
+  {
+    defaultJobArgs: {
+      numRetries: 2,
+    },
+    keepFailedJobs: false,
+  },
+);

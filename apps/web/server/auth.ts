@@ -1,6 +1,6 @@
 import { Adapter, AdapterUser } from "@auth/core/adapters";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import NextAuth, {
   DefaultSession,
   getServerSession,
@@ -17,6 +17,7 @@ import {
   users,
   verificationTokens,
 } from "@karakeep/db/schema";
+import { fetchGithubUser, getGithubToken } from "@karakeep/shared-server";
 import serverConfig from "@karakeep/shared/config";
 import { validatePassword } from "@karakeep/trpc/auth";
 import { User } from "@karakeep/trpc/models/users";
@@ -158,6 +159,7 @@ if (oauth.wellKnownUrl) {
         id: profile.sub,
         name: profile.name || profile.email,
         email: profile.email,
+        image: profile.picture || null,
         role: admin || firstUser ? "admin" : "user",
       };
     },
@@ -220,9 +222,16 @@ export const authOptions: NextAuthOptions = {
       // As such, oauth users can sign in even if email verification is enabled.
       // We might want to change this in the future.
 
+      if (!credentials && credUser.image) {
+        await db
+          .update(users)
+          .set({ image: credUser.image })
+          .where(eq(users.email, email));
+      }
+
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
         token.user = {
           id: user.id,
@@ -231,6 +240,76 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           role: user.role ?? "user",
         };
+      }
+      // Persist OAuth tokens so workers/tRPC can access GitHub on the user's behalf
+      // via the Logto Account API. JWT strategy does not auto-populate the accounts
+      // table, so we upsert on each sign-in.
+      if (account && token.user?.id && account.type === "oauth") {
+        try {
+          const providerAccountId =
+            account.providerAccountId ??
+            (profile as { sub?: string } | undefined)?.sub;
+          if (providerAccountId) {
+            const values = {
+              userId: token.user.id,
+              type: "oauth" as const,
+              provider: account.provider,
+              providerAccountId,
+              access_token: account.access_token ?? null,
+              refresh_token: account.refresh_token ?? null,
+              expires_at: account.expires_at ?? null,
+              token_type: account.token_type ?? null,
+              scope: account.scope ?? null,
+              id_token: account.id_token ?? null,
+              session_state:
+                typeof account.session_state === "string"
+                  ? account.session_state
+                  : null,
+            };
+            const existing = await db
+              .select({ userId: accounts.userId })
+              .from(accounts)
+              .where(
+                and(
+                  eq(accounts.provider, account.provider),
+                  eq(accounts.providerAccountId, providerAccountId),
+                ),
+              )
+              .limit(1);
+            if (existing.length > 0) {
+              await db
+                .update(accounts)
+                .set(values)
+                .where(
+                  and(
+                    eq(accounts.provider, account.provider),
+                    eq(accounts.providerAccountId, providerAccountId),
+                  ),
+                );
+            } else {
+              await db.insert(accounts).values(values);
+            }
+          }
+        } catch (err) {
+          console.error("[AUTH] Failed to persist OAuth account tokens:", err);
+        }
+
+        // Pull GitHub avatar on sign-in so UserAvatar shows the real photo.
+        try {
+          const gh = await getGithubToken(token.user.id);
+          if (gh?.token) {
+            const ghUser = await fetchGithubUser(gh.token);
+            if (ghUser?.avatar_url) {
+              await db
+                .update(users)
+                .set({ image: ghUser.avatar_url })
+                .where(eq(users.id, token.user.id));
+              token.user.image = ghUser.avatar_url;
+            }
+          }
+        } catch (err) {
+          console.error("[AUTH] Failed to fetch GitHub avatar:", err);
+        }
       }
       return token;
     },

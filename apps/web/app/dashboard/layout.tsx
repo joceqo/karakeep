@@ -11,8 +11,10 @@ import { getServerAuthSession } from "@/server/auth";
 import { TRPCError } from "@trpc/server";
 import { TFunction } from "i18next";
 import {
+  Activity,
   Archive,
   ClipboardList,
+  Github,
   Highlighter,
   Home,
   Search,
@@ -91,6 +93,16 @@ export default async function Dashboard({
         name: t("common.archive"),
         icon: <Archive size={18} />,
         path: "/dashboard/archive",
+      },
+      {
+        name: "GitHub Search",
+        icon: <Github size={18} />,
+        path: "/dashboard/github/search",
+      },
+      {
+        name: "GitHub Activity",
+        icon: <Activity size={18} />,
+        path: "/dashboard/github/activity",
       },
       // Only show wrapped if user has at least 20 bookmarks
       showWrapped.data

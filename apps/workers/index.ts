@@ -18,6 +18,10 @@ import { AssetPreprocessingWorker } from "./workers/assetPreprocessingWorker";
 import { BackupSchedulingWorker, BackupWorker } from "./workers/backupWorker";
 import { CrawlerWorker } from "./workers/crawlerWorker";
 import { FeedRefreshingWorker, FeedWorker } from "./workers/feedWorker";
+import {
+  GithubActivitySchedulingWorker,
+  GithubSyncWorker,
+} from "./workers/githubWorker";
 import { OpenAiWorker } from "./workers/inference/inferenceWorker";
 import { RuleEngineWorker } from "./workers/ruleEngineWorker";
 import { SearchIndexingWorker } from "./workers/searchWorker";
@@ -35,6 +39,7 @@ const workerBuilders = {
   webhook: () => WebhookWorker.build(),
   ruleEngine: () => RuleEngineWorker.build(),
   backup: () => BackupWorker.build(),
+  github: () => GithubSyncWorker.build(),
 } as const;
 
 type WorkerName = keyof typeof workerBuilders;
@@ -78,6 +83,10 @@ async function main() {
     BackupSchedulingWorker.start();
   }
 
+  if (workers.some((w) => w.name === "github")) {
+    GithubActivitySchedulingWorker.start();
+  }
+
   await Promise.any([
     Promise.all([
       ...workers.map(({ worker }) => worker.run()),
@@ -95,6 +104,9 @@ async function main() {
   }
   if (workers.some((w) => w.name === "backup")) {
     BackupSchedulingWorker.stop();
+  }
+  if (workers.some((w) => w.name === "github")) {
+    GithubActivitySchedulingWorker.stop();
   }
   for (const { worker } of workers) {
     worker.stop();

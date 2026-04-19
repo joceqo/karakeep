@@ -210,10 +210,10 @@ export default function BookmarkPreview({
     <>
       {/* Render original layout for wide screens */}
       <div className="hidden h-full grid-cols-3 overflow-hidden bg-background lg:grid">
-        <div className="col-span-2 h-full w-full overflow-auto p-2">
+        <div className="col-span-2 h-full w-full min-w-0 overflow-auto p-2">
           {contentSection}
         </div>
-        <div className="flex flex-col gap-4 overflow-auto bg-accent p-4">
+        <div className="flex min-w-0 flex-col gap-4 overflow-auto bg-accent p-4">
           {detailsSection}
         </div>
       </div>
